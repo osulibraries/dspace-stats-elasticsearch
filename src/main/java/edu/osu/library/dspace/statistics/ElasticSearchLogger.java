@@ -8,6 +8,7 @@ import org.apache.log4j.Logger;
 import org.dspace.content.*;
 import org.dspace.content.Collection;
 import org.dspace.core.ConfigurationManager;
+import org.dspace.core.Constants;
 import org.dspace.eperson.EPerson;
 import org.dspace.statistics.util.DnsLookup;
 import org.dspace.statistics.util.LocationUtils;
@@ -129,7 +130,11 @@ public class ElasticSearchLogger {
             docBuilder.field("ip", ip);
 
             docBuilder.field("id", dspaceObject.getID());
-            docBuilder.field("type", dspaceObject.getType());
+
+            docBuilder.field("typeIndex", dspaceObject.getType());
+
+            docBuilder.field("type", Constants.typeText[dspaceObject.getType()]);
+
             // Save the current time
             docBuilder.field("time", DateFormatUtils.format(new Date(), DATE_FORMAT_8601));
             if (currentUser != null) {
