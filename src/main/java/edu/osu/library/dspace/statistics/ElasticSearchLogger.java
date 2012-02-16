@@ -3,6 +3,7 @@ package edu.osu.library.dspace.statistics;
 
 import com.maxmind.geoip.Location;
 import com.maxmind.geoip.LookupService;
+import org.apache.commons.lang.exception.ExceptionUtils;
 import org.apache.commons.lang.time.DateFormatUtils;
 import org.apache.log4j.Logger;
 import org.dspace.content.*;
@@ -81,15 +82,25 @@ public class ElasticSearchLogger {
         }
     }
 
-    public static void post(DSpaceObject dspaceObject, HttpServletRequest request, EPerson currentUser) {
+    public static void post(DSpaceObject dspaceObject, HttpServletRequest request, EPerson currentUser) throws Exception {
 
         log.info("hi from fsdfsdfsdf logger");
 
 
-        String indexName = "kb";
+        String indexName = "dspace";
         String indexType = "stats";
-
-        Client client = new TransportClient().addTransportAddress(new InetSocketTransportAddress("127.0.0.1", 9300));
+        Client client = null;
+        String address = "127.0.0.1";
+        int port = 9300;
+        try{
+            InetSocketTransportAddress clientAddress = new InetSocketTransportAddress(address, port);
+            client = new TransportClient().addTransportAddress(clientAddress);
+        } catch (Exception e) {
+            throw new Exception(
+                    new StringBuilder().append("Could not create transport client at \"")
+                            .append(address).append(":").append(port).append("\".").toString()
+            );
+        }
         //   client.admin().indices().create(new CreateIndexRequest(indexName)).actionGet();
 
         //   client.admin().cluster().health(new ClusterHealthRequest(indexName).waitForYellowStatus()).actionGet();
@@ -218,10 +229,11 @@ public class ElasticSearchLogger {
             client.close();
 
         } catch (RuntimeException re) {
+            log.error("RunTimer in ESL:\n" + ExceptionUtils.getStackTrace(re));
             throw re;
         } catch (Exception e) {
 
-            log.error(e.getMessage(), e);
+            log.error(e.getMessage());
         }
     }
 
