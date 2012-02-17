@@ -49,6 +49,8 @@ public class ElasticSearchLogger {
     private static Client client;
     public static final String indexName = "dspaceelastic";
     public static final String indexType = "stats";
+    public static final String address = "127.0.0.1";
+    public static final int port = 9300;
 
     static {
         log.info("DSpace ElasticSearchLogger Initializing");
@@ -90,8 +92,8 @@ public class ElasticSearchLogger {
             count++;
         }
         
-        //Ensure the Index is ready.
-        client = new TransportClient().addTransportAddress(new InetSocketTransportAddress("127.0.0.1", 9300));
+        //Initialize the connection to Elastic Search, and ensure our index is available.
+        client = createElasticClient();
         
         IndicesExistsRequest indicesExistsRequest = new IndicesExistsRequest();
         indicesExistsRequest.indices(new String[] {indexName});
@@ -108,11 +110,7 @@ public class ElasticSearchLogger {
         } else {
             log.info("DS ES index already exists");
         }
-        
 
-        
-        
-        
         log.info("DSpace ElasticSearchLogger Initialized Successfully (I suppose)");
     }
 
@@ -120,17 +118,9 @@ public class ElasticSearchLogger {
 
         log.info("DS-ES post for type:"+dspaceObject.getType() + " -- " + dspaceObject.getName());
 
-
-
-        String address = "127.0.0.1";
-        int port = 9300;
-        if(client != null) {
-            client = new TransportClient().addTransportAddress(new InetSocketTransportAddress(address, port));
+        if(client == null) {
+            client = createElasticClient();
         }
-        //   client.admin().indices().create(new CreateIndexRequest(indexName)).actionGet();
-
-        //   client.admin().cluster().health(new ClusterHealthRequest(indexName).waitForYellowStatus()).actionGet();
-
 
         boolean isSpiderBot = SpiderDetector.isSpider(request);
 
@@ -330,6 +320,10 @@ public class ElasticSearchLogger {
 
     public static boolean isUseProxies() {
         return useProxies;
+    }
+    
+    public static Client createElasticClient() {
+        return new TransportClient().addTransportAddress(new InetSocketTransportAddress(address, port));
     }
 
 }
