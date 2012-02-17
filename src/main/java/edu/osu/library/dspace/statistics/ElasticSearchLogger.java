@@ -13,13 +13,17 @@ import org.dspace.eperson.EPerson;
 import org.dspace.statistics.util.DnsLookup;
 import org.dspace.statistics.util.LocationUtils;
 import org.dspace.statistics.util.SpiderDetector;
+import org.elasticsearch.action.ActionFuture;
+import org.elasticsearch.action.admin.indices.exists.IndicesExistsRequest;
+import org.elasticsearch.action.admin.indices.exists.IndicesExistsResponse;
 import org.elasticsearch.client.Client;
 import org.elasticsearch.client.action.index.IndexRequestBuilder;
 import org.elasticsearch.client.transport.TransportClient;
+import org.elasticsearch.common.settings.ImmutableSettings;
+import org.elasticsearch.common.settings.Settings;
 import org.elasticsearch.common.transport.InetSocketTransportAddress;
 import org.elasticsearch.common.xcontent.XContentBuilder;
 import org.elasticsearch.common.xcontent.XContentFactory;
-
 
 import javax.servlet.http.HttpServletRequest;
 import java.io.FileNotFoundException;
@@ -40,8 +44,13 @@ public class ElasticSearchLogger {
     private static final LookupService locationService;
 
     private static Map<String, String> metadataStorageInfo;
+    
+    private static Client client;
+    public static final String indexName = "dspaceelastic";
+    public static final String indexType = "stats";
 
     static {
+        log.info("DSpace ElasticSearchLogger Initializing");
 
         LookupService service = null;
         // Get the db file for the location
@@ -79,17 +88,43 @@ public class ElasticSearchLogger {
             log.info("solr-statistics.metadata.item." + count + "=" + metadataVal);
             count++;
         }
+        
+        //Ensure the Index is ready.
+        client = new TransportClient().addTransportAddress(new InetSocketTransportAddress("127.0.0.1", 9300));
+        
+        IndicesExistsRequest indicesExistsRequest = new IndicesExistsRequest();
+        indicesExistsRequest.indices(new String[] {indexName});
+
+        ActionFuture<IndicesExistsResponse> actionFutureIndicesExist = client.admin().indices().exists(indicesExistsRequest);        
+        log.info("DS ES Checking if index exists");
+        if(! actionFutureIndicesExist.actionGet().isExists() ) {
+            //If elastic search index exists, then we are good to go, otherwise, we need to create that index. Should only need to happen once ever.
+            log.info("DS ES index didn't exist, we need to create it.");
+            Settings settings = ImmutableSettings.settingsBuilder()
+                    .put("number_of_replicas", 1).put("number_of_shards", 5).build();
+            client.admin().indices().prepareCreate(indexName).setSettings(settings).execute().actionGet();
+            log.info("DS ES index didn't exist, but we created it.");
+        } else {
+            log.info("DS ES index already exists");
+        }
+        
+
+        
+        
+        
+        log.info("DSpace ElasticSearchLogger Initialized Successfully (I suppose)");
     }
 
     public static void post(DSpaceObject dspaceObject, HttpServletRequest request, EPerson currentUser) {
 
-        log.info("hi from fsdfsdfsdf logger");
+        log.info("DS-ES post for type:"+dspaceObject.getType() + " -- " + dspaceObject.getName());
 
 
-        String indexName = "kb";
-        String indexType = "stats";
 
-        Client client = new TransportClient().addTransportAddress(new InetSocketTransportAddress("127.0.0.1", 9300));
+
+        if(client != null) {
+            client = new TransportClient().addTransportAddress(new InetSocketTransportAddress("127.0.0.1", 9300));
+        }
         //   client.admin().indices().create(new CreateIndexRequest(indexName)).actionGet();
 
         //   client.admin().cluster().health(new ClusterHealthRequest(indexName).waitForYellowStatus()).actionGet();
