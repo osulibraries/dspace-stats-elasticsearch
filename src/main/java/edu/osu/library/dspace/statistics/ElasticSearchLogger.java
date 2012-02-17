@@ -3,6 +3,7 @@ package edu.osu.library.dspace.statistics;
 
 import com.maxmind.geoip.Location;
 import com.maxmind.geoip.LookupService;
+import org.apache.commons.lang.exception.ExceptionUtils;
 import org.apache.commons.lang.time.DateFormatUtils;
 import org.apache.log4j.Logger;
 import org.dspace.content.*;
@@ -121,9 +122,10 @@ public class ElasticSearchLogger {
 
 
 
-
+        String address = "127.0.0.1";
+        int port = 9300;
         if(client != null) {
-            client = new TransportClient().addTransportAddress(new InetSocketTransportAddress("127.0.0.1", 9300));
+            client = new TransportClient().addTransportAddress(new InetSocketTransportAddress(address, port));
         }
         //   client.admin().indices().create(new CreateIndexRequest(indexName)).actionGet();
 
@@ -253,10 +255,10 @@ public class ElasticSearchLogger {
             client.close();
 
         } catch (RuntimeException re) {
+            log.error("RunTimer in ESL:\n" + ExceptionUtils.getStackTrace(re));
             throw re;
         } catch (Exception e) {
-
-            log.error(e.getMessage(), e);
+            log.error(e.getMessage());
         }
     }
 
