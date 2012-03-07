@@ -45,12 +45,14 @@ public class ElasticSearchLogger {
     private static final LookupService locationService;
 
     private static Map<String, String> metadataStorageInfo;
-    
-    private static Client client;
+
     public static final String indexName = "dspaceelastic";
     public static final String indexType = "stats";
     public static final String address = "127.0.0.1";
     public static final int port = 9300;
+
+    private static Client client;
+    private static TransportClient transportClient = new TransportClient().addTransportAddress(new InetSocketTransportAddress(address, port));
 
     static {
         log.info("DSpace ElasticSearchLogger Initializing");
@@ -118,9 +120,7 @@ public class ElasticSearchLogger {
 
         log.info("DS-ES post for type:"+dspaceObject.getType() + " -- " + dspaceObject.getName());
 
-        if(client == null) {
-            client = createElasticClient();
-        }
+        Client myClient = createElasticClient();
 
         boolean isSpiderBot = SpiderDetector.isSpider(request);
 
@@ -229,26 +229,24 @@ public class ElasticSearchLogger {
                 docBuilder.endArray();
             }
 
-
             storeParents(docBuilder, getParents(dspaceObject));
 
-
-            log.info(docBuilder.toString());
             docBuilder.endObject();
 
             if (docBuilder != null) {
-                IndexRequestBuilder irb = client.prepareIndex(indexName, indexType)
+                IndexRequestBuilder irb = myClient.prepareIndex(indexName, indexType)
                         .setSource(docBuilder);
+                log.info("Executing document insert into index");
                 irb.execute().actionGet();
             }
-
-            client.close();
 
         } catch (RuntimeException re) {
             log.error("RunTimer in ESL:\n" + ExceptionUtils.getStackTrace(re));
             throw re;
         } catch (Exception e) {
             log.error(e.getMessage());
+        } finally {
+            myClient.close();
         }
     }
 
@@ -321,9 +319,17 @@ public class ElasticSearchLogger {
     public static boolean isUseProxies() {
         return useProxies;
     }
-    
+
     public static Client createElasticClient() {
-        return new TransportClient().addTransportAddress(new InetSocketTransportAddress(address, port));
+
+        if( client == null || transportClient == null || transportClient.connectedNodes().size()==0) {
+            log.info("Creating a new elastic-client");
+            client = new TransportClient().addTransportAddress(new InetSocketTransportAddress(address, port));
+        } else {
+            log.info("Hurray, no need to create another elastic-client");
+        }
+        
+        return client; 
     }
 
 }
