@@ -46,13 +46,13 @@ public class ElasticSearchLogger {
 
     private static Map<String, String> metadataStorageInfo;
 
+    public static final String clusterName = "dspacestatslogging";
     public static final String indexName = "dspaceelastic";
     public static final String indexType = "stats";
     public static final String address = "127.0.0.1";
     public static final int port = 9300;
 
     private static Client client;
-    private static TransportClient transportClient = new TransportClient().addTransportAddress(new InetSocketTransportAddress(address, port));
 
     static {
         log.info("DSpace ElasticSearchLogger Initializing");
@@ -106,7 +106,10 @@ public class ElasticSearchLogger {
             //If elastic search index exists, then we are good to go, otherwise, we need to create that index. Should only need to happen once ever.
             log.info("DS ES index didn't exist, we need to create it.");
             Settings settings = ImmutableSettings.settingsBuilder()
-                    .put("number_of_replicas", 1).put("number_of_shards", 5).build();
+                    .put("number_of_replicas", 1)
+                    .put("number_of_shards", 5)
+                    .put("cluster.name", clusterName)
+                    .build();
             client.admin().indices().prepareCreate(indexName).setSettings(settings).execute().actionGet();
             log.info("DS ES index didn't exist, but we created it.");
         } else {
@@ -320,16 +323,15 @@ public class ElasticSearchLogger {
         return useProxies;
     }
 
-    public static Client createElasticClient() {
+    public static TransportClient createTransportClient() {
+        Settings settings = ImmutableSettings.settingsBuilder().put("cluster.name", clusterName).build();
+        TransportClient transportClient = new TransportClient(settings).addTransportAddress(new InetSocketTransportAddress(address, port));
+        return transportClient;
+    }
 
-        if( client == null || transportClient == null || transportClient.connectedNodes().size()==0) {
-            log.info("Creating a new elastic-client");
-            client = new TransportClient().addTransportAddress(new InetSocketTransportAddress(address, port));
-        } else {
-            log.info("Hurray, no need to create another elastic-client");
-        }
-        
-        return client; 
+    public static Client createElasticClient() {
+        log.info("Creating a new elastic-client");
+        return createTransportClient();
     }
 
 }
