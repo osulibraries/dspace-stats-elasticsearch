@@ -176,8 +176,10 @@ public class ElasticSearchLogger {
 
             docBuilder.field("id", dspaceObject.getID());
 
+            // The numerical constant that represents the DSpaceObject TYPE. i.e. 0=bitstream, 2=item, ...
             docBuilder.field("typeIndex", dspaceObject.getType());
 
+            // The text that represent the DSpaceObject TYPE. i.e. BITSTREAM, ITEM, COLLECTION, COMMUNITY
             docBuilder.field("type", Constants.typeText[dspaceObject.getType()]);
 
             // Save the current time
