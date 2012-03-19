@@ -54,12 +54,17 @@ public class ElasticSearchLogger {
 
     private static Client client;
 
+    private static boolean havingTroubles = false;
+
+
     static {
         initializeElasticSearch();
     }
 
     public ElasticSearchLogger() {
+        if(havingTroubles) {
             initializeElasticSearch();
+        }
 
     }
 
@@ -102,10 +107,10 @@ public class ElasticSearchLogger {
             log.info("solr-statistics.metadata.item." + count + "=" + metadataVal);
             count++;
         }
-        
+
         //Initialize the connection to Elastic Search, and ensure our index is available.
-        client = createElasticClient();
-        
+        client = createElasticClient(true);
+
         IndicesExistsRequest indicesExistsRequest = new IndicesExistsRequest();
         indicesExistsRequest.indices(new String[] {indexName});
 
@@ -126,13 +131,14 @@ public class ElasticSearchLogger {
         }
 
         log.info("DSpace ElasticSearchLogger Initialized Successfully (I suppose)");
+        havingTroubles=false;
     }
 
     public static void post(DSpaceObject dspaceObject, HttpServletRequest request, EPerson currentUser) {
 
         log.info("DS-ES post for type:"+dspaceObject.getType() + " -- " + dspaceObject.getName());
 
-        Client myClient = createElasticClient();
+        Client myClient = createElasticClient(false);
 
         boolean isSpiderBot = SpiderDetector.isSpider(request);
 
@@ -254,9 +260,11 @@ public class ElasticSearchLogger {
 
         } catch (RuntimeException re) {
             log.error("RunTimer in ESL:\n" + ExceptionUtils.getStackTrace(re));
+            havingTroubles=true;
             throw re;
         } catch (Exception e) {
             log.error(e.getMessage());
+            havingTroubles=true;
         } finally {
             myClient.close();
         }
@@ -332,15 +340,18 @@ public class ElasticSearchLogger {
         return useProxies;
     }
 
-    public static TransportClient createTransportClient() {
+    public static TransportClient createTransportClient(boolean skipCheck) {
+        if(havingTroubles && !skipCheck) {
+            initializeElasticSearch();
+        }
         Settings settings = ImmutableSettings.settingsBuilder().put("cluster.name", clusterName).build();
         TransportClient transportClient = new TransportClient(settings).addTransportAddress(new InetSocketTransportAddress(address, port));
         return transportClient;
     }
 
-    public static Client createElasticClient() {
+    public static Client createElasticClient(boolean skipCheck) {
         log.info("Creating a new elastic-client");
-        return createTransportClient();
+        return createTransportClient(skipCheck);
     }
 
 }
