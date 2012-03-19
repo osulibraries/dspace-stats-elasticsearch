@@ -36,13 +36,13 @@ public class ElasticSearchLogger {
 
     private static Logger log = Logger.getLogger(ElasticSearchLogger.class);
 
-    private static final boolean useProxies;
+    private static boolean useProxies;
 
     public static final String DATE_FORMAT_8601 = "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'";
 
     public static final String DATE_FORMAT_DCDATE = "yyyy-MM-dd'T'HH:mm:ss'Z'";
 
-    private static final LookupService locationService;
+    private static LookupService locationService;
 
     private static Map<String, String> metadataStorageInfo;
 
@@ -55,6 +55,15 @@ public class ElasticSearchLogger {
     private static Client client;
 
     static {
+        initializeElasticSearch();
+    }
+
+    public ElasticSearchLogger() {
+            initializeElasticSearch();
+
+    }
+
+    public static void initializeElasticSearch() {
         log.info("DSpace ElasticSearchLogger Initializing");
 
         LookupService service = null;
