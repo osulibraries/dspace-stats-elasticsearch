@@ -46,11 +46,11 @@ public class ElasticSearchLogger {
 
     private static Map<String, String> metadataStorageInfo;
 
-    public static final String clusterName = "dspacestatslogging";
-    public static final String indexName = "dspaceelastic";
-    public static final String indexType = "stats";
-    public static final String address = "127.0.0.1";
-    public static final int port = 9300;
+    public static String clusterName = "dspacestatslogging";
+    public static String indexName = "dspacebatch3";
+    public static String indexType = "stats";
+    public static String address = "127.0.0.1";
+    public static int port = 9300;
 
     private static Client client;
 
@@ -107,6 +107,13 @@ public class ElasticSearchLogger {
             log.info("solr-statistics.metadata.item." + count + "=" + metadataVal);
             count++;
         }
+        
+        // Configurable values for all elasticsearch connection constants
+        clusterName = getConfigurationStringWithFallBack("statistics.elasticsearch.clusterName", clusterName);
+        indexName   = getConfigurationStringWithFallBack("statistics.elasticsearch.indexName", indexName);
+        indexType   = getConfigurationStringWithFallBack("statistics.elasticsearch.indexType", indexType);
+        address     = getConfigurationStringWithFallBack("statistics.elasticsearch.address", address);
+        port        = ConfigurationManager.getIntProperty("statistics.elasticsearch.port", port);
 
         //Initialize the connection to Elastic Search, and ensure our index is available.
         client = createElasticClient(true);
@@ -354,6 +361,15 @@ public class ElasticSearchLogger {
     public static Client createElasticClient(boolean skipCheck) {
         log.info("Creating a new elastic-client");
         return createTransportClient(skipCheck);
+    }
+    
+    public static String getConfigurationStringWithFallBack(String configurationKey, String defaultFallbackValue) {
+        String configDrivenValue = ConfigurationManager.getProperty(configurationKey);
+        if(configDrivenValue == null || configDrivenValue.trim().equalsIgnoreCase("")) {
+            return defaultFallbackValue;
+        } else {
+            return configDrivenValue;
+        }
     }
 
 }
