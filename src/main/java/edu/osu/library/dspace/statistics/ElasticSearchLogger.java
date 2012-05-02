@@ -25,6 +25,8 @@ import org.elasticsearch.common.settings.Settings;
 import org.elasticsearch.common.transport.InetSocketTransportAddress;
 import org.elasticsearch.common.xcontent.XContentBuilder;
 import org.elasticsearch.common.xcontent.XContentFactory;
+import org.elasticsearch.node.Node;
+import org.elasticsearch.node.NodeBuilder;
 
 import javax.servlet.http.HttpServletRequest;
 import java.io.FileNotFoundException;
@@ -57,18 +59,24 @@ public class ElasticSearchLogger {
     private static boolean havingTroubles = false;
 
 
-    static {
+    public ElasticSearchLogger() {
+        // nobody should be instantiating this...
+    }
+
+    public ElasticSearchLogger(boolean doInitialize) {
         initializeElasticSearch();
     }
 
-    public ElasticSearchLogger() {
-        if(havingTroubles) {
-            initializeElasticSearch();
-        }
-
+    public static ElasticSearchLogger getInstance() {
+        return ElasticSearchLoggerSingletonHolder.instance;
     }
 
-    public static void initializeElasticSearch() {
+    // Singleton Pattern of "Initialization on demand holder idiom"
+    private static class ElasticSearchLoggerSingletonHolder {
+        public static final ElasticSearchLogger instance = new ElasticSearchLogger(true);
+    }
+
+    public void initializeElasticSearch() {
         log.info("DSpace ElasticSearchLogger Initializing");
 
         LookupService service = null;
@@ -116,7 +124,7 @@ public class ElasticSearchLogger {
         port        = ConfigurationManager.getIntProperty("statistics.elasticsearch.port", port);
 
         //Initialize the connection to Elastic Search, and ensure our index is available.
-        client = createElasticClient(true);
+        client = getClient();
 
         IndicesExistsRequest indicesExistsRequest = new IndicesExistsRequest();
         indicesExistsRequest.indices(new String[] {indexName});
@@ -141,11 +149,10 @@ public class ElasticSearchLogger {
         havingTroubles=false;
     }
 
-    public static void post(DSpaceObject dspaceObject, HttpServletRequest request, EPerson currentUser) {
-
+    public void post(DSpaceObject dspaceObject, HttpServletRequest request, EPerson currentUser) {
         log.info("DS-ES post for type:"+dspaceObject.getType() + " -- " + dspaceObject.getName());
 
-        Client myClient = createElasticClient(false);
+        client = ElasticSearchLogger.getInstance().getClient();
 
         boolean isSpiderBot = SpiderDetector.isSpider(request);
 
@@ -261,9 +268,17 @@ public class ElasticSearchLogger {
             docBuilder.endObject();
 
             if (docBuilder != null) {
-                IndexRequestBuilder irb = myClient.prepareIndex(indexName, indexType)
+                IndexRequestBuilder irb = client.prepareIndex(indexName, indexType)
                         .setSource(docBuilder);
                 log.info("Executing document insert into index");
+                if(client == null) {
+                    log.info("Hey, client is null");
+                } else {
+                    log.info("Client is not null");
+                    if(client.admin() == null) {
+                        log.info("But the client.admin is null");
+                    }
+                }
                 irb.execute().actionGet();
             }
 
@@ -275,12 +290,51 @@ public class ElasticSearchLogger {
             log.error(e.getMessage());
             havingTroubles=true;
         } finally {
-            myClient.close();
+            client.close();
         }
     }
 
+    public static String getClusterName() {
+        return clusterName;
+    }
 
-    public static void buildParents(DSpaceObject dso, HashMap<String, ArrayList<Integer>> parents)
+    public static void setClusterName(String clusterName) {
+        ElasticSearchLogger.clusterName = clusterName;
+    }
+
+    public static String getIndexName() {
+        return indexName;
+    }
+
+    public static void setIndexName(String indexName) {
+        ElasticSearchLogger.indexName = indexName;
+    }
+
+    public static String getIndexType() {
+        return indexType;
+    }
+
+    public static void setIndexType(String indexType) {
+        ElasticSearchLogger.indexType = indexType;
+    }
+
+    public static String getAddress() {
+        return address;
+    }
+
+    public static void setAddress(String address) {
+        ElasticSearchLogger.address = address;
+    }
+
+    public static int getPort() {
+        return port;
+    }
+
+    public static void setPort(int port) {
+        ElasticSearchLogger.port = port;
+    }
+
+    public void buildParents(DSpaceObject dso, HashMap<String, ArrayList<Integer>> parents)
             throws SQLException {
         if (dso instanceof Community) {
             Community comm = (Community) dso;
@@ -314,7 +368,7 @@ public class ElasticSearchLogger {
 
     }
 
-    public static HashMap<String, ArrayList<Integer>> getParents(DSpaceObject dso)
+    public HashMap<String, ArrayList<Integer>> getParents(DSpaceObject dso)
             throws SQLException {
         HashMap<String, ArrayList<Integer>> parents = new HashMap<String, ArrayList<Integer>>();
         parents.put("owningComm", new ArrayList<Integer>());
@@ -325,7 +379,7 @@ public class ElasticSearchLogger {
         return parents;
     }
 
-    public static void storeParents(XContentBuilder docBuilder, HashMap<String, ArrayList<Integer>> parents) throws IOException {
+    public void storeParents(XContentBuilder docBuilder, HashMap<String, ArrayList<Integer>> parents) throws IOException {
 
         Iterator it = parents.keySet().iterator();
         while (it.hasNext()) {
@@ -345,25 +399,46 @@ public class ElasticSearchLogger {
     }
 
 
-    public static boolean isUseProxies() {
+    public boolean isUseProxies() {
         return useProxies;
     }
 
-    public static TransportClient createTransportClient(boolean skipCheck) {
+    public void createTransportClient(boolean skipCheck) {
         if(havingTroubles && !skipCheck) {
             initializeElasticSearch();
         }
         Settings settings = ImmutableSettings.settingsBuilder().put("cluster.name", clusterName).build();
-        TransportClient transportClient = new TransportClient(settings).addTransportAddress(new InetSocketTransportAddress(address, port));
-        return transportClient;
+        client = new TransportClient(settings).addTransportAddress(new InetSocketTransportAddress(address, port));
     }
 
-    public static Client createElasticClient(boolean skipCheck) {
-        log.info("Creating a new elastic-client");
-        return createTransportClient(skipCheck);
+    public void createElasticClient() {
+        //createElasticClient(true);
+    }
+
+    public Client getClient() {
+        if(client == null) {
+            log.info("getClient reports null client");
+            createNodeClient();
+            
+            
+            //createElasticClient();
+        }
+        return client;
     }
     
-    public static String getConfigurationStringWithFallBack(String configurationKey, String defaultFallbackValue) {
+    public void createNodeClient() {
+        Node node = NodeBuilder.nodeBuilder().client(true).clusterName(clusterName).node();
+        log.info("Got node");
+        client = node.client();
+        log.info("Created new node client");
+    }
+
+    public void createElasticClient(boolean skipCheck) {
+        log.info("Creating a new elastic-client");
+        //createTransportClient(skipCheck);
+    }
+    
+    public String getConfigurationStringWithFallBack(String configurationKey, String defaultFallbackValue) {
         String configDrivenValue = ConfigurationManager.getProperty(configurationKey);
         if(configDrivenValue == null || configDrivenValue.trim().equalsIgnoreCase("")) {
             return defaultFallbackValue;
