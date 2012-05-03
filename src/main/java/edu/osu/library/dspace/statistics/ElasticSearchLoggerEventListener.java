@@ -15,7 +15,6 @@ public class ElasticSearchLoggerEventListener extends AbstractUsageEventListener
 
         if(event instanceof UsageEvent)
         {
-            log.info("HEY EVERYBODY!");
             try{
 
                 UsageEvent ue = (UsageEvent) event;
@@ -23,7 +22,7 @@ public class ElasticSearchLoggerEventListener extends AbstractUsageEventListener
                 EPerson currentUser = ue.getContext() == null ? null : ue.getContext().getCurrentUser();
 
                 ElasticSearchLogger.getInstance().post(ue.getObject(), ue.getRequest(), currentUser);
-                log.info("Successfully logged " + ue.getObject().toString());
+                log.info("Successfully logged " + ue.getObject().getTypeText() + "_" + ue.getObject().getID() + " " + ue.getObject().getName());
             }
             catch(Exception e)
             {

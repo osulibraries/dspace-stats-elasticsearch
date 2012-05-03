@@ -150,7 +150,7 @@ public class ElasticSearchLogger {
     }
 
     public void post(DSpaceObject dspaceObject, HttpServletRequest request, EPerson currentUser) {
-        log.info("DS-ES post for type:"+dspaceObject.getType() + " -- " + dspaceObject.getName());
+        //log.info("DS-ES post for type:"+dspaceObject.getType() + " -- " + dspaceObject.getName());
 
         client = ElasticSearchLogger.getInstance().getClient();
 
@@ -270,14 +270,9 @@ public class ElasticSearchLogger {
             if (docBuilder != null) {
                 IndexRequestBuilder irb = client.prepareIndex(indexName, indexType)
                         .setSource(docBuilder);
-                log.info("Executing document insert into index");
+                //log.info("Executing document insert into index");
                 if(client == null) {
-                    log.info("Hey, client is null");
-                } else {
-                    log.info("Client is not null");
-                    if(client.admin() == null) {
-                        log.info("But the client.admin is null");
-                    }
+                    log.error("Hey, client is null");
                 }
                 irb.execute().actionGet();
             }
@@ -417,7 +412,7 @@ public class ElasticSearchLogger {
 
     public Client getClient() {
         if(client == null) {
-            log.info("getClient reports null client");
+            log.error("getClient reports null client");
             createNodeClient();
             
             
